@@ -1,14 +1,19 @@
 package ZST;
 
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.zeromq.ZContext;
 import org.zeromq.ZMQ;
+import org.zeromq.ZMQException;
 import org.zeromq.ZMQ.Poller;
 import org.zeromq.ZMQ.Socket;
 
@@ -32,7 +37,7 @@ import zmq.SocketBase;
  *
  */
 
-public class ZstNode {
+public class ZstNode extends Thread {
 
 	// Constants
     // ---------
@@ -73,6 +78,10 @@ public class ZstNode {
     protected Socket m_subscriber;
     protected Socket m_stage;
     protected Poller m_poller;
+    protected List<Socket> m_incomingSockets;
+    
+    //Thread variables
+    private Boolean m_exitFlag = false;
     
     //Constructor for stages
 	public ZstNode(String nodeId, int stagePort){
@@ -90,8 +99,11 @@ public class ZstNode {
 		m_methods = new HashMap<String, ZstMethod>();
 		m_internalNodeMethods = new HashMap<String, ZstMethod>();
 		m_peers = new HashMap<String, ZstPeerlink>();
+		m_incomingSockets = new ArrayList<Socket>();
 		m_stageAddress = stageAddress;
 		initNetwork();
+		
+		
 	}
 	
 	
@@ -141,6 +153,9 @@ public class ZstNode {
 			m_reply.bind("tcp://*:" + m_stagePort);
 		}
 		
+		m_incomingSockets.add(m_reply);
+		m_incomingSockets.add(m_subscriber);
+		
 		m_poller = new Poller(2);
 		m_poller.register(m_reply, Poller.POLLIN);
 		m_poller.register(m_subscriber, Poller.POLLIN);
@@ -162,14 +177,155 @@ public class ZstNode {
 	 */
 	private void registerInternalMethods() throws NoSuchMethodException, SecurityException
 	{
-		Method registerNode = getClass().getDeclaredMethod("replyRegisterNode", new Class[]{ZstMethod.class});
+		Method replyRegisterNode_callback = getClass().getDeclaredMethod("replyRegisterNode", new Class[]{ZstMethod.class});
 		m_internalNodeMethods.put(REPLY_REGISTER_NODE, new ZstMethod(
 				REPLY_REGISTER_NODE, 
 				m_nodeId, 
-				ZstMethod.READ, 
+				ZstMethod.RESPONDER, 
 				null,
 				this,
-				registerNode));
+				replyRegisterNode_callback));
+		
+		Method replyRegisterMethod_callback = getClass().getDeclaredMethod("replyRegisterMethod", new Class[]{ZstMethod.class});
+		m_internalNodeMethods.put(REPLY_REGISTER_METHOD, new ZstMethod(
+				REPLY_REGISTER_METHOD, 
+				m_nodeId, 
+				ZstMethod.RESPONDER, 
+				null,
+				this,
+				replyRegisterMethod_callback));
+		
+		Method replyNodePeerlinks_callback = getClass().getDeclaredMethod("replyNodePeerlinks", new Class[]{ZstMethod.class});
+		m_internalNodeMethods.put(REPLY_NODE_PEERLINKS, new ZstMethod(
+				REPLY_NODE_PEERLINKS, 
+				m_nodeId, 
+				ZstMethod.RESPONDER, 
+				null,
+				this,
+				replyNodePeerlinks_callback));
+		
+		Method replyMethodList_callback = getClass().getDeclaredMethod("replyMethodList", new Class[]{ZstMethod.class});
+		m_internalNodeMethods.put(REPLY_METHOD_LIST, new ZstMethod(
+				REPLY_METHOD_LIST, 
+				m_nodeId, 
+				ZstMethod.RESPONDER, 
+				null,
+				this,
+				replyMethodList_callback));
+		
+		Method replyAllPeerMethods_callback = getClass().getDeclaredMethod("replyAllPeerMethods", new Class[]{ZstMethod.class});
+		m_internalNodeMethods.put(REPLY_ALL_PEER_METHODS, new ZstMethod(
+				REPLY_ALL_PEER_METHODS, 
+				m_nodeId, 
+				ZstMethod.RESPONDER, 
+				null,
+				this,
+				replyAllPeerMethods_callback));
+		
+		Method disconnectPeer_callback = getClass().getDeclaredMethod("disconnectPeer", new Class[]{ZstMethod.class});
+		m_internalNodeMethods.put(DISCONNECT_PEER, new ZstMethod(
+				DISCONNECT_PEER, 
+				m_nodeId, 
+				ZstMethod.WRITE, 
+				null,
+				this,
+				disconnectPeer_callback));
+	}
+	
+	
+	/*
+	 * Main listen loop. Receives poll events and calls local methods
+	 */
+	public void listen()
+	{
+		System.out.println("Node listening for requests...");
+		while (!m_exitFlag){
+			int incomingPolls = m_poller.poll();
+			if(incomingPolls > 0){
+				for(int i = 0; i < m_incomingSockets.size(); i++){
+					if(m_poller.pollin(i)){
+						receiveMessage(ZstIo.recv(m_poller.getSocket(i)));
+					}
+				}
+			}
+		}
+		System.out.println("Exiting listen loop");
+	}
+	
+	
+	/*
+	 * Message caller. Runs local methods from messages
+	 */
+	private void receiveMessage(MethodMessage recv) {
+		System.out.print("Recieved method '" + recv.method + "'");
+		if (recv.data != null)
+        {
+            if (recv.data.getOutput() != null)
+                System.out.print("' for '" + recv.data.getNode() + "' with value '" + recv.data.getOutput().toString());
+            System.out.println("'");
+        }
+		
+		
+		Map<String, ZstMethod> methodList = null;
+		if(m_internalNodeMethods.containsKey(recv.method)){
+			methodList = m_internalNodeMethods;
+		} else if(m_methods.containsKey(recv.method)){
+			methodList = m_methods;
+		}
+		
+		try {
+			Object callbackObj = methodList.get(recv.method).getCallbackObject();
+			Method callback = methodList.get(recv.method).getCallback();
+			callback.invoke(callbackObj, recv.data);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		//Run local callbacks if they're set to run when the remote method updates
+        if (recv.data != null)
+        {
+            if (m_peers.containsKey(recv.data.getNode()))
+            {
+                if (m_peers.get(recv.data.getNode()).getMethods().containsKey(recv.method))
+                {
+                    if (m_peers.get(recv.data.getNode()).getMethods().get(recv.method).getCallback() != null &&
+                    	m_peers.get(recv.data.getNode()).getMethods().get(recv.method).getCallbackObject() != null)
+                    {
+                    	Object callbackObj = m_peers.get(recv.data.getNode()).getMethods().get(recv.method).getCallbackObject();
+                    	try {
+							m_peers.get(recv.data.getNode()).getMethods().get(recv.method).getCallback().invoke(callbackObj, recv.data);
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+                    }
+                }
+            }
+        }
+	}
+	
+	
+	/**
+	 * Remote peer is announcing that it's leaving. Remove from local lists.
+	 */
+	private Object disconnectPeer(ZstMethod methodData){
+		 System.out.println("Peer '" + methodData.getNode() + "' is leaving.");
+         if (m_peers.containsKey(methodData.getNode()))
+         {
+             try{
+                 m_subscriber.disconnect(m_peers.get(methodData.getNode()).getPublisherAddress());
+             } catch (ZMQException e) {
+                 throw e;
+             }
+
+             m_peers.get(methodData.getNode()).disconnect();
+             m_peers.remove(methodData.getNode());
+         }
+         return null;
+	}
+
+	public void run()
+	{
+		listen();
 	}
 	
 	
@@ -178,8 +334,15 @@ public class ZstNode {
 	 */
 	public Boolean close()
 	{
-		m_poller.unregister(m_reply);
-		m_poller.unregister(m_subscriber);
+		//Tell stage we're leaving
+        ZstIo.send(m_publisher, DISCONNECT_PEER, new ZstMethod(DISCONNECT_PEER, m_nodeId));
+
+		m_exitFlag = true;
+		for(Socket s : m_incomingSockets){
+			m_poller.unregister(s);
+			//s.close();
+		}
+		
 		m_ctx.destroy();
 		
 		return true;
@@ -197,6 +360,7 @@ public class ZstNode {
     
 	/**
 	 * Request remote node to register this node
+	 * @socket Socket to register through
 	 */
     public Boolean requestRegisterNode(Socket socket){
         System.out.println("REQ-->: Requesting remote node to register our addresses. Reply:" + m_replyAddress + ", Publisher:" + m_publisherAddress);
@@ -225,6 +389,7 @@ public class ZstNode {
 	 * Reply to request for node registration
 	 *
 	 * @methodData  Incoming methodData.
+	 * @return 		Null
 	 */
     protected Object replyRegisterNode(ZstMethod methodData)
     {
@@ -379,16 +544,23 @@ public class ZstNode {
         return null;
     }
     
+    
     /**
-     * Request a dictionary of peers nodes linked to the remote node</summary>
-     * @return
+     * Request a dictionary of peers nodes linked to the remote node
+     * 
+     * @return Map of names/peers
      */
     public Map<String, ZstPeerlink> requestNodePeerlinks()
     {
         return requestNodePeerlinks(m_stage);
     }
 
-    /// <summary>Request a dictionary of peers nodes linked to the remote node</summary>
+    
+    /**
+     * Request a dictionary of peers nodes linked to the remote node
+     * 
+     * @return Map of names/peers
+     */
     public Map<String, ZstPeerlink> requestNodePeerlinks(Socket socket)
     {
         ZstIo.send(socket, REPLY_NODE_PEERLINKS);
@@ -397,5 +569,86 @@ public class ZstNode {
         JsonObject peerlinkObj = (JsonObject) ZstIo.jsonParser.parse(peerData);
         return ZstPeerlink.buildLocalPeerlinks(peerlinkObj);
     }
+    
+    /**
+     * Reply to another node's request for this node's linked peers
+     * 
+     * @return null
+     */
+    protected Object replyNodePeerlinks(ZstMethod methodData)
+    {
+        Map<String, Object> peerDict = new HashMap<String, Object>();
+        
+        for(Entry<String, ZstPeerlink> peer : m_peers.entrySet() )
+            peerDict.put(peer.getKey(), peer.getValue().asMap());
+        ZstMethod request = new ZstMethod(REPLY_NODE_PEERLINKS, m_nodeId, "", null);
+        request.setOutput(peerDict);
+        ZstIo.send(m_reply, OK, request);
+        return null;
+    }
+    
+    
+    public Map<String, ZstMethod> requestMethodList()
+    {
+        return requestMethodList(m_stage);
+    }
+
+
+   
+    /// <summary>Request a dictionary of methods on a remote node</summary>
+    public Map<String, ZstMethod> requestMethodList(Socket socket)
+    {
+        ZstIo.send(socket, REPLY_METHOD_LIST);
+        String jsonStr = ZstIo.recv(socket).data.getOutput().toString();
+        JsonObject methodList = (JsonObject) ZstIo.jsonParser.parse(jsonStr);
+        return ZstMethod.buildLocalMethods(methodList);
+    }
+
+    /// <summary>Reply with a list of methods this node owns</summary>
+    public Object replyMethodList(ZstMethod methodData)
+    {
+        Map<String, Object> methodDict = new HashMap<String, Object>();
+        for(Entry<String, ZstMethod> method : m_methods.entrySet())
+            methodDict.put(method.getKey(), method.getValue().asMap());
+        ZstMethod request = new ZstMethod(REPLY_NODE_PEERLINKS, m_nodeId, "", null);
+        request.setOutput(methodDict);
+        ZstIo.send(m_reply, OK, request);
+        return null;
+    }
+
+
+    // Get all methods on all connected peers
+    //----------------------
+    /// <summary>Request a dictionary of methods on a remote node</summary>
+    public Map<String, ZstMethod> requestAllPeerMethods()
+    {
+        return requestAllPeerMethods(m_stage);
+    }
+
+    /// <summary>Request a list of all available methods provided by all connected peers on the remote node</summary>
+    public Map<String, ZstMethod> requestAllPeerMethods(Socket socket)
+    {
+        ZstIo.send(socket, REPLY_METHOD_LIST);
+        String jsonStr = ZstIo.recv(socket).data.getOutput().toString();
+        JsonObject peerMethodList = (JsonObject)ZstIo.jsonParser.parse(jsonStr);
+        return ZstMethod.buildLocalMethods(peerMethodList);
+    }
+
+    /// <summary>Reply with a list of all available methods provided by all connected peers on the remote node</summary>
+    public Object replyAllPeerMethods(ZstMethod methodData)
+    {
+        Map<String, Object> methodDict = new HashMap<String, Object>();
+        for(Entry<String, ZstPeerlink> peer : m_peers.entrySet())
+        {
+            for(Entry<String, ZstMethod> method : peer.getValue().getMethods().entrySet())
+                methodDict.put(method.getKey(), method.getValue().asMap());
+        }
+        ZstMethod request = new ZstMethod(REPLY_NODE_PEERLINKS, m_nodeId, "", null);
+        request.setOutput(methodDict);
+        ZstIo.send(m_reply, OK, request);
+        return null;
+    }
+    
+    
 }
 

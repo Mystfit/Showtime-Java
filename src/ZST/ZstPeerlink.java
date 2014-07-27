@@ -68,7 +68,7 @@ public class ZstPeerlink {
     		m_subscriber.close();
     }
     
-    public Map<String, Object> asDict()
+    public Map<String, Object> asMap()
     {
     	Map<String, Object> outDict = new HashMap<String, Object>();
     	Map<String, Map<String, Object> > methods = new HashMap<String, Map<String,Object>>();
