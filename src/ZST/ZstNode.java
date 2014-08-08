@@ -177,7 +177,7 @@ public class ZstNode extends Thread {
 	 */
 	private void registerInternalMethods() throws NoSuchMethodException, SecurityException
 	{
-		Method replyRegisterNode_callback = getClass().getDeclaredMethod("replyRegisterNode", new Class[]{ZstMethod.class});
+		Method replyRegisterNode_callback = ZstNode.class.getDeclaredMethod("replyRegisterNode", new Class[]{ZstMethod.class});
 		m_internalNodeMethods.put(REPLY_REGISTER_NODE, new ZstMethod(
 				REPLY_REGISTER_NODE, 
 				m_nodeId, 
@@ -186,7 +186,7 @@ public class ZstNode extends Thread {
 				this,
 				replyRegisterNode_callback));
 		
-		Method replyRegisterMethod_callback = getClass().getDeclaredMethod("replyRegisterMethod", new Class[]{ZstMethod.class});
+		Method replyRegisterMethod_callback = ZstNode.class.getDeclaredMethod("replyRegisterMethod", new Class[]{ZstMethod.class});
 		m_internalNodeMethods.put(REPLY_REGISTER_METHOD, new ZstMethod(
 				REPLY_REGISTER_METHOD, 
 				m_nodeId, 
@@ -195,7 +195,7 @@ public class ZstNode extends Thread {
 				this,
 				replyRegisterMethod_callback));
 		
-		Method replyNodePeerlinks_callback = getClass().getDeclaredMethod("replyNodePeerlinks", new Class[]{ZstMethod.class});
+		Method replyNodePeerlinks_callback = ZstNode.class.getDeclaredMethod("replyNodePeerlinks", new Class[]{ZstMethod.class});
 		m_internalNodeMethods.put(REPLY_NODE_PEERLINKS, new ZstMethod(
 				REPLY_NODE_PEERLINKS, 
 				m_nodeId, 
@@ -204,7 +204,7 @@ public class ZstNode extends Thread {
 				this,
 				replyNodePeerlinks_callback));
 		
-		Method replyMethodList_callback = getClass().getDeclaredMethod("replyMethodList", new Class[]{ZstMethod.class});
+		Method replyMethodList_callback =ZstNode.class.getDeclaredMethod("replyMethodList", new Class[]{ZstMethod.class});
 		m_internalNodeMethods.put(REPLY_METHOD_LIST, new ZstMethod(
 				REPLY_METHOD_LIST, 
 				m_nodeId, 
@@ -213,7 +213,7 @@ public class ZstNode extends Thread {
 				this,
 				replyMethodList_callback));
 		
-		Method replyAllPeerMethods_callback = getClass().getDeclaredMethod("replyAllPeerMethods", new Class[]{ZstMethod.class});
+		Method replyAllPeerMethods_callback = ZstNode.class.getDeclaredMethod("replyAllPeerMethods", new Class[]{ZstMethod.class});
 		m_internalNodeMethods.put(REPLY_ALL_PEER_METHODS, new ZstMethod(
 				REPLY_ALL_PEER_METHODS, 
 				m_nodeId, 
@@ -222,7 +222,7 @@ public class ZstNode extends Thread {
 				this,
 				replyAllPeerMethods_callback));
 		
-		Method disconnectPeer_callback = getClass().getDeclaredMethod("disconnectPeer", new Class[]{ZstMethod.class});
+		Method disconnectPeer_callback = ZstNode.class.getDeclaredMethod("disconnectPeer", new Class[]{ZstMethod.class});
 		m_internalNodeMethods.put(DISCONNECT_PEER, new ZstMethod(
 				DISCONNECT_PEER, 
 				m_nodeId, 
@@ -501,8 +501,22 @@ public class ZstNode extends Thread {
 	 *
 	 * @method  Method name.
 	 * @accessMode  Access mode for method (READ, WRITE, RESPONDER).
+	 * @callbackobj Object to run callback on.
+	 * @callback Callback method.
+	 */
+    public void requestRegisterMethod(String method, String accessMode, Object callbackObject, Method callback){
+        requestRegisterMethod(method, accessMode, null, callbackObject, callback, m_stage);
+    }
+    
+    
+    /**
+	 * Requests a local method on a remote node
+	 *
+	 * @method  Method name.
+	 * @accessMode  Access mode for method (READ, WRITE, RESPONDER).
 	 * @args Arguments for method.
-	 * @socket Socket to send request through.
+	 * @callbackobj Object to run callback on.
+	 * @callback Callback method.
 	 */
     public void requestRegisterMethod(String method, String accessMode, Map<String, Object> args, Object callbackObject, Method callback){
         requestRegisterMethod(method, accessMode, args, callbackObject, callback, m_stage);
@@ -511,7 +525,7 @@ public class ZstNode extends Thread {
     /// <summary>Registers a local method on a remote node</summary>
     public void requestRegisterMethod(String method, String accessMode, Map<String, Object> args, Object callbackObject, Method callback, Socket socket)
     {
-        System.out.println("REQ-->: Registering method " + method + " with remote node.");
+        System.out.println("REQ-->: Registering method " + method + " with remote node and args " + args.toString());
 
         //Register local copy of our method first
         m_methods.put(method, new ZstMethod(method, m_nodeId, accessMode, args, callbackObject, callback));
