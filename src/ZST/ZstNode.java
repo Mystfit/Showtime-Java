@@ -444,7 +444,7 @@ public class ZstNode extends Thread {
     {
         Socket socket = m_ctx.createSocket(ZMQ.REQ);
         socket.setLinger(0);
-        socket.setReceiveTimeOut(2);
+        //socket.setReceiveTimeOut(2);
 
         socket.connect(peer.getReplyAddress());
         

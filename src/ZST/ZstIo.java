@@ -49,11 +49,9 @@ public class ZstIo {
 			message = ZMsg.recvMsg(socket, ZMQ.DONTWAIT);
 		
 		String data = message.getLast().toString();
-		
 		JsonObject mData = (JsonObject) ZstIo.jsonParser.parse(data);
-		
+	
 		return new MethodMessage(message.getFirst().toString(), ZstMethod.jsonObjToZstMethod(mData));
-		
 	}
 }
 

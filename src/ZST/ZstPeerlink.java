@@ -34,6 +34,12 @@ public class ZstPeerlink {
     public Map<String, ZstMethod> getMethods() { return m_methods; }
     private Map<String, ZstMethod> m_methods;
     
+    public ZstMethod getMethod(String method){
+    	if(m_methods.containsKey(method))
+    		return m_methods.get(method);
+    	return null;
+    }
+    
     public Socket getRequestSocket(){ return m_request; }
     public void setRequestSocket(Socket s){ m_request = s; }
     private Socket m_request;
@@ -41,6 +47,10 @@ public class ZstPeerlink {
     public Socket getSubSocket(){ return m_subscriber; }
     public void setSubSocket(Socket s){ m_subscriber = s; }
     private Socket m_subscriber;
+    
+    public void setIsConnected(boolean connected){ m_isConnected = connected; }
+    public boolean getIsConnected(){ return m_isConnected; }
+    private boolean m_isConnected;
     
     public ZstPeerlink(String name, String replyAddress, String publisherAddress)
     {
