@@ -26,9 +26,12 @@ public class TestNode{
 		
         node.requestRegisterMethod("bloople", ZstMethod.WRITE, nodeArgs, this, testCallback);
         
+        Map<String, ZstPeerlink> peers = node.requestNodePeerlinks();
+        
+        node.subscribeToNode(peers.get("LiveNode"));        
+        
 		
 		//ZstMethod.mapToZstMethod(fakeArgs);
-		Map<String, ZstPeerlink> peers = node.requestNodePeerlinks();
 		//node.close();
 		//System.out.print(peers);
 	}

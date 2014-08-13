@@ -41,7 +41,7 @@ public class ZstNode extends Thread {
 
 	// Constants
     // ---------
-
+	
     // Replies
     public static String REPLY = "zst_reply";
     public static String OK = "zst_ok";
@@ -172,8 +172,8 @@ public class ZstNode extends Thread {
 	
 	/**
 	 * Registers internal methods this node owns
-	 * @throws SecurityException 
-	 * @throws NoSuchMethodException 
+	 * @throws 		SecurityException 
+	 * @throws 		NoSuchMethodException 
 	 */
 	private void registerInternalMethods() throws NoSuchMethodException, SecurityException
 	{
@@ -233,7 +233,7 @@ public class ZstNode extends Thread {
 	}
 	
 	
-	/*
+	/**
 	 * Main listen loop. Receives poll events and calls local methods
 	 */
 	public void listen()
@@ -253,7 +253,7 @@ public class ZstNode extends Thread {
 	}
 	
 	
-	/*
+	/**
 	 * Message caller. Runs local methods from messages
 	 */
 	private void receiveMessage(MethodMessage recv) {
@@ -263,49 +263,56 @@ public class ZstNode extends Thread {
             if (recv.data.getOutput() != null)
                 System.out.print("' for '" + recv.data.getNode() + "' with value '" + recv.data.getOutput().toString());
             System.out.println("'");
-        }
-		
-		
-		Map<String, ZstMethod> methodList = null;
-		if(m_internalNodeMethods.containsKey(recv.method)){
-			methodList = m_internalNodeMethods;
-		} else if(m_methods.containsKey(recv.method)){
-			methodList = m_methods;
-		}
-		
-		try {
-			Object callbackObj = methodList.get(recv.method).getCallbackObject();
-			Method callback = methodList.get(recv.method).getCallback();
-			callback.invoke(callbackObj, recv.data);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		
-		//Run local callbacks if they're set to run when the remote method updates
-        if (recv.data != null)
-        {
-            if (m_peers.containsKey(recv.data.getNode()))
-            {
-                if (m_peers.get(recv.data.getNode()).getMethods().containsKey(recv.method))
-                {
-                    if (m_peers.get(recv.data.getNode()).getMethods().get(recv.method).getCallback() != null &&
-                    	m_peers.get(recv.data.getNode()).getMethods().get(recv.method).getCallbackObject() != null)
-                    {
-                    	Object callbackObj = m_peers.get(recv.data.getNode()).getMethods().get(recv.method).getCallbackObject();
-                    	try {
-							m_peers.get(recv.data.getNode()).getMethods().get(recv.method).getCallback().invoke(callbackObj, recv.data);
-						} catch (Exception e) {
-							e.printStackTrace();
-						}
-                    }
-                }
-            }
+	
+			//Is this a method this node owns?
+			if(recv.data.getNode() == m_nodeId){
+				Map<String, ZstMethod> methodList = null;
+				if(m_internalNodeMethods.containsKey(recv.method)){
+					methodList = m_internalNodeMethods;
+				} else if(m_methods.containsKey(recv.method)){
+					methodList = m_methods;
+				}
+				
+				try {
+					ZstMethod method = methodList.get(recv.method);
+					Object callbackObj = methodList.get(recv.method).getCallbackObject();
+					Method callback = methodList.get(recv.method).getCallback();
+					callback.invoke(callbackObj, recv.data);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+				
+			//Or does this method belong to another node?
+			} else {
+				//Run local callbacks for remote method
+		        if (recv.data != null)
+		        {
+		            if (m_peers.containsKey(recv.data.getNode()))
+		            {
+		            	ZstPeerlink peer = m_peers.get(recv.data.getNode());
+		                if (peer.getMethods().containsKey(recv.method))
+		                {
+		                	ZstMethod peerMethod = m_peers.get(recv.data.getNode()).getMethods().get(recv.method);
+		                    if (peerMethod.getLocalCallbackMethod() != null && peerMethod.getLocalCallbackObject() != null)
+		                    {
+		                    	Object callbackObj = peerMethod.getLocalCallbackObject();
+		                    	try {
+		                    		peerMethod.getLocalCallbackMethod().invoke(callbackObj, recv.data);
+								} catch (Exception e) {
+									e.printStackTrace();
+								}
+		                    }
+		                }
+		            }
+		        }
+			}
         }
 	}
 	
 	
 	/**
 	 * Remote peer is announcing that it's leaving. Remove from local lists.
+	 * @return 		null
 	 */
 	private Object disconnectPeer(ZstMethod methodData){
 		 System.out.println("Peer '" + methodData.getNode() + "' is leaving.");
@@ -322,15 +329,18 @@ public class ZstNode extends Thread {
          }
          return null;
 	}
-
+	
+	/**
+	 * Thread function
+	 */
 	public void run()
 	{
 		listen();
 	}
 	
-	
 	/**
 	 * Close this node
+	 * @return 		Success flag
 	 */
 	public Boolean close()
 	{
@@ -349,9 +359,13 @@ public class ZstNode extends Thread {
 	}
 	
 	
+	
+	// Node registration
+    //------------------
 
 	/**
 	 * Request stage to register this node
+	 * @return 		Success flag
 	 */
     public Boolean requestRegisterNode(){
         return requestRegisterNode(m_stage);
@@ -360,7 +374,7 @@ public class ZstNode extends Thread {
     
 	/**
 	 * Request remote node to register this node
-	 * @socket Socket to register through
+	 * @param Socket 		Socket to register through
 	 */
     public Boolean requestRegisterNode(Socket socket){
         System.out.println("REQ-->: Requesting remote node to register our addresses. Reply:" + m_replyAddress + ", Publisher:" + m_publisherAddress);
@@ -387,9 +401,8 @@ public class ZstNode extends Thread {
     
 	/**
 	 * Reply to request for node registration
-	 *
-	 * @methodData  Incoming methodData.
-	 * @return 		Null
+	 * @param methodData  	Incoming methodData.
+	 * @return 				Null
 	 */
     protected Object replyRegisterNode(ZstMethod methodData)
     {
@@ -411,8 +424,7 @@ public class ZstNode extends Thread {
     
     /**
 	 * Subscribe to messages from remote node
-	 *
-	 * @methodData  Incoming methodData.
+	 * @param methodData  		Incoming methodData.
 	 */
     public void subscribeToNode(ZstPeerlink peer)
     {
@@ -426,8 +438,7 @@ public class ZstNode extends Thread {
     
     /**
 	 * Requests a remote node to subscribe to our requests
-	 *
-	 * @methodData  Incoming methodData.
+	 * @param methodDdata  		Incoming methodData.
 	 */
     public void connectToPeer(ZstPeerlink peer)
     {
@@ -445,11 +456,12 @@ public class ZstNode extends Thread {
     }
     
     
+    //Remote method registration
+    //------------------------------------
     /**
 	 * Requests a local method on a remote node
-	 *
-	 * @method  Method name.
-	 * @accessMode  Access mode for method (READ, WRITE, RESPONDER).
+	 * @param method 			Method name.
+	 * @param accessMode		Access mode for method (READ, WRITE, RESPONDER).
 	 */
     public void requestRegisterMethod(String method, String accessMode){
         requestRegisterMethod(method, accessMode, null, null, null, m_stage);
@@ -458,10 +470,9 @@ public class ZstNode extends Thread {
     
     /**
 	 * Requests a local method on a remote node
-	 *
-	 * @method  Method name.
-	 * @accessMode  Access mode for method (READ, WRITE, RESPONDER).
-	 * @args Arguments for method.
+	 * @param method		  	Method name.
+	 * @param accessMode  		Access mode for method (READ, WRITE, RESPONDER).
+	 * @param args 				Arguments for method.
 	 */
     public void requestRegisterMethod(String method, String accessMode, Map<String, Object> args){
         requestRegisterMethod(method, accessMode, args, null, null, m_stage);
@@ -470,10 +481,9 @@ public class ZstNode extends Thread {
     
     /**
 	 * Requests a local method on a remote node
-	 *
-	 * @method  Method name.
-	 * @accessMode  Access mode for method (READ, WRITE, RESPONDER).
-	 * @args Arguments for method.
+	 * @param method  			Method name.
+	 * @param accessMode  		Access mode for method (READ, WRITE, RESPONDER).
+	 * @param args 				Arguments for method.
 	 */
     public void requestRegisterMethod(String method, String accessMode, String[] args){
         Map<String, Object> argsDict = new HashMap<String, Object>();
@@ -485,11 +495,10 @@ public class ZstNode extends Thread {
     
     /**
 	 * Requests a local method on a remote node
-	 *
-	 * @method  Method name.
-	 * @accessMode  Access mode for method (READ, WRITE, RESPONDER).
-	 * @args Arguments for method.
-	 * @socket Socket to send request through.
+	 * @param method  			Method name.
+	 * @param accessMode  		Access mode for method (READ, WRITE, RESPONDER).
+	 * @param args 				Arguments for method.
+	 * @param socket 			Socket to send request through.
 	 */
     public void requestRegisterMethod(String method, String accessMode, Map<String, Object> args, Socket socket){
         requestRegisterMethod(method, accessMode, args, null, null, socket);
@@ -498,11 +507,10 @@ public class ZstNode extends Thread {
     
     /**
 	 * Requests a local method on a remote node
-	 *
-	 * @method  Method name.
-	 * @accessMode  Access mode for method (READ, WRITE, RESPONDER).
-	 * @callbackobj Object to run callback on.
-	 * @callback Callback method.
+	 * @param method  			Method name.
+	 * @param accessMode  		Access mode for method (READ, WRITE, RESPONDER).
+	 * @param callbackobj 		Object to run callback on.
+	 * @param callback 			Callback method.
 	 */
     public void requestRegisterMethod(String method, String accessMode, Object callbackObject, Method callback){
         requestRegisterMethod(method, accessMode, null, callbackObject, callback, m_stage);
@@ -511,18 +519,25 @@ public class ZstNode extends Thread {
     
     /**
 	 * Requests a local method on a remote node
-	 *
-	 * @method  Method name.
-	 * @accessMode  Access mode for method (READ, WRITE, RESPONDER).
-	 * @args Arguments for method.
-	 * @callbackobj Object to run callback on.
-	 * @callback Callback method.
+	 * @param method  			Method name.
+	 * @param accessMode  		Access mode for method (READ, WRITE, RESPONDER).
+	 * @param args 				Arguments for method.
+	 * @param callbackobj 		Object to run callback on.
+	 * @param callback 			Callback method.
 	 */
     public void requestRegisterMethod(String method, String accessMode, Map<String, Object> args, Object callbackObject, Method callback){
         requestRegisterMethod(method, accessMode, args, callbackObject, callback, m_stage);
     }
 
-    /// <summary>Registers a local method on a remote node</summary>
+    /**
+     * Registers a local method on a remote node</summary>
+     * @param method  			Method name.
+	 * @param accessMode  		Access mode for method (READ, WRITE, RESPONDER).
+	 * @param args 				Arguments for method.
+	 * @param callbackobj 		Object to run callback on.
+	 * @param callback 			Callback method.
+     * @param socket 			socket
+     */
     public void requestRegisterMethod(String method, String accessMode, Map<String, Object> args, Object callbackObject, Method callback, Socket socket)
     {
         System.out.println("REQ-->: Registering method " + method + " with remote node and args " + args.toString());
@@ -543,8 +558,7 @@ public class ZstNode extends Thread {
     
     /**
 	 * Reply to another node's method registration request
-	 *
-	 * @methoddata  Method data.
+	 * @param methodData  	Method data.
 	 */
     protected Object replyRegisterMethod(ZstMethod methodData)
     {
@@ -559,10 +573,12 @@ public class ZstNode extends Thread {
     }
     
     
+    
+    // Node peerlink accessors
+    //------------------------
     /**
      * Request a dictionary of peers nodes linked to the remote node
-     * 
-     * @return Map of names/peers
+     * @return 		Map of names/peers
      */
     public Map<String, ZstPeerlink> requestNodePeerlinks()
     {
@@ -572,8 +588,7 @@ public class ZstNode extends Thread {
     
     /**
      * Request a dictionary of peers nodes linked to the remote node
-     * 
-     * @return Map of names/peers
+     * @return 		Map of names/peers
      */
     public Map<String, ZstPeerlink> requestNodePeerlinks(Socket socket)
     {
@@ -586,8 +601,7 @@ public class ZstNode extends Thread {
     
     /**
      * Reply to another node's request for this node's linked peers
-     * 
-     * @return null
+     * @return 		null
      */
     protected Object replyNodePeerlinks(ZstMethod methodData)
     {
@@ -608,8 +622,12 @@ public class ZstNode extends Thread {
     }
 
 
-   
-    /// <summary>Request a dictionary of methods on a remote node</summary>
+    // Node method accessors
+    //----------------------
+   /**
+    * Request a list of methods on a remote node
+    * @return		 Map of methods
+    */
     public Map<String, ZstMethod> requestMethodList(Socket socket)
     {
         ZstIo.send(socket, REPLY_METHOD_LIST);
@@ -618,7 +636,11 @@ public class ZstNode extends Thread {
         return ZstMethod.buildLocalMethods(methodList);
     }
 
-    /// <summary>Reply with a list of methods this node owns</summary>
+    /**
+     * Reply with a list of methods this node owns
+     * @param 		methodData
+     * @return 		null
+     */
     public Object replyMethodList(ZstMethod methodData)
     {
         Map<String, Object> methodDict = new HashMap<String, Object>();
@@ -630,16 +652,24 @@ public class ZstNode extends Thread {
         return null;
     }
 
-
+    
+    
     // Get all methods on all connected peers
     //----------------------
-    /// <summary>Request a dictionary of methods on a remote node</summary>
+    /**
+     * Request a dictionary of methods on a remote node
+     * @return 		Map of methods
+     */
     public Map<String, ZstMethod> requestAllPeerMethods()
     {
         return requestAllPeerMethods(m_stage);
     }
 
-    /// <summary>Request a list of all available methods provided by all connected peers on the remote node</summary>
+    /**
+     * Request a list of all available methods provided by all connected peers on the remote node</summary>
+     * @param 		socket
+     * @return 		Map of methods
+     */
     public Map<String, ZstMethod> requestAllPeerMethods(Socket socket)
     {
         ZstIo.send(socket, REPLY_METHOD_LIST);
@@ -648,7 +678,11 @@ public class ZstNode extends Thread {
         return ZstMethod.buildLocalMethods(peerMethodList);
     }
 
-    /// <summary>Reply with a list of all available methods provided by all connected peers on the remote node</summary>
+    /**
+     * Reply with a list of all available methods provided by all connected peers on the remote node
+     * @param 		methodData
+     * @return 		null
+     */
     public Object replyAllPeerMethods(ZstMethod methodData)
     {
         Map<String, Object> methodDict = new HashMap<String, Object>();
@@ -664,5 +698,123 @@ public class ZstNode extends Thread {
     }
     
     
+    
+    // Method publishing / controlling
+    // -------------------------------
+    /**
+     * Updates a local method by name
+     * @param method 		Method name
+     * @param method 		Method value
+     */
+    public void updateLocalMethodByName(String method, Object methodValue)
+    {
+		if(m_methods.containsKey(method)){
+			updateLocalMethod(m_methods.get(method), methodValue);
+		}
+    }
+    
+    /**
+     * Updates a local method
+     * @method 				Method name
+     * @methodValue 		Method value
+     */
+    public void updateLocalMethod(ZstMethod method, Object methodValue)
+    {
+    	//Check we own this method
+    	if(method.getNode() == m_nodeId){
+    		Socket socket;
+    		if(method.getAccessMode() == ZstMethod.RESPONDER)
+    			socket = m_reply;
+    		else
+    			socket = m_publisher;
+    		
+    		method.setOutput(methodValue);
+    		
+    		ZstIo.send(socket, method.getName(), method);
+    	}
+    }
+    
+    
+    /**
+     * Updates a method on a remote node by name
+     * @param name 		Method name
+     * @return 			Remote method response (if method is a responder)
+     */
+    public ZstMethod updateRemoteMethodByName(String name)
+    {
+    	return updateRemoteMethodByName(name, null);
+    }
+    
+    /**
+     * Updates a method on a remote node by name
+     * @param name		Method name		
+     * @param args		Method arguments
+     * @return			Remote method response (if method is a responder)
+     */
+    public ZstMethod updateRemoteMethodByName(String name, Map<String, Object> args)
+    {
+    	if(m_methods.containsKey(name))
+    	{
+    		ZstMethod method = m_methods.get(name);
+    		return updateRemoteMethod(method, args);
+    	}
+    	return null;
+    }
+    
+    /**
+     * Updates a method on a remote node
+     * @param name		Method name		
+     * @return			Remote method response (if method is a responder)
+     */
+    public ZstMethod updateRemoteMethod(ZstMethod method)
+    {
+    	return updateRemoteMethod(method, null);
+    }
+    
+    /**
+     * Updates a method on a remote node
+     * @param name		Method name		
+     * @param args		Method arguments
+     * @return			Remote method response (if method is a responder)
+     */
+    public ZstMethod updateRemoteMethod(ZstMethod method, Map<String, Object> args)
+    {
+    	Socket socket;
+    	if(method.getAccessMode() == ZstMethod.RESPONDER)
+    		socket = m_peers.get(method.getNode()).getRequestSocket();
+    	else
+    		socket = m_publisher;
+    	
+    	if(m_peers.containsKey(method.getNode())){
+    		if(ZstMethod.compareArgLists(m_peers.get(method.getNode()).getMethods().get(method.getName()).getArgs(), args)){
+    			ZstMethod methodRequest = new ZstMethod(method.getName(), method.getNode(), method.getAccessMode(), args);
+    			ZstIo.send(socket, method.getName(), methodRequest);
+    			
+    			if(methodRequest.getAccessMode() == ZstMethod.RESPONDER){
+    				return ZstIo.recv(socket).data;
+    			}
+    		}
+    	}
+    	
+    	return null;
+    }
+    
+    
+    /**
+     * Subscribe to updates from a remote method
+     * @param method 			Remote method to subscribe to 
+     * @param callbackObject	Object to run callback on
+     * @param callbackMethod	Callback to run
+     */
+    public void subscribeToMethod(ZstMethod method, Object callbackObject, Method callbackMethod)
+    {
+    	if(m_peers.containsKey(method.getNode()))
+    	{
+    		ZstMethod remoteMethod = m_peers.get(method.getNode()).getMethods().get(method.getName());
+    		remoteMethod.setLocalCallbackObject(callbackObject);
+    		remoteMethod.setLocalCallbackMethod(callbackMethod);
+    	}
+    }
+        
 }
 

@@ -95,9 +95,9 @@ public class ZstPeerlink {
     		
     		Map<String, ZstMethod> methodList = ZstMethod.buildLocalMethods(inMethods);	
     		outPeerLinks.put(peer.getKey(), new ZstPeerlink(
-    				peerObj.get(NAME).toString(), 
-    				peerObj.get(REPLY_ADDRESS).toString(), 
-    				peerObj.get(PUBLISHER_ADDRESS).toString(), 
+    				peerObj.get(NAME).getAsString(), 
+    				peerObj.get(REPLY_ADDRESS).getAsString(), 
+    				peerObj.get(PUBLISHER_ADDRESS).getAsString(), 
     				methodList));
     	}
     	

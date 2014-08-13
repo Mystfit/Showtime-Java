@@ -23,31 +23,36 @@ public class ZstMethod {
 	public static String METHOD_ARGS = "zst_method_args";
 	public static String METHOD_ACCESSMODE = "zst_method_Accessmode";
 	public static String METHOD_OUTPUT = "zst_method_output";
-
+	
+	//Method name
 	public String getName() {
 		return m_name;
 	}
 
 	private String m_name;
-
+	
+	//Origin Node ID
 	public String getNode() {
 		return m_node;
 	}
 
 	private String m_node;
-
+	
+	//Access mode type
 	public String getAccessMode() {
 		return m_accessMode;
 	}
 
 	private String m_accessMode;
-
+	
+	//Arguments
 	public Map<String, Object> getArgs() {
 		return m_args;
 	}
 
 	private Map<String, Object> m_args;
 
+	//Output
 	public Object getOutput() {
 		return m_output;
 	}
@@ -58,6 +63,7 @@ public class ZstMethod {
 
 	private Object m_output;
 
+	//Remote callback objects
 	public Method getCallback() {
 		return m_callback;
 	};
@@ -69,6 +75,27 @@ public class ZstMethod {
 	}
 
 	private Object m_callbackObject;
+	
+	//Local callback objects
+	public Object getLocalCallbackObject(){
+		return m_localCallbackObject;
+	}
+	
+	public void setLocalCallbackObject(Object callbackObject){
+		m_localCallbackObject = callbackObject;
+	}
+	
+	private Object m_localCallbackObject;
+	
+	public Method getLocalCallbackMethod(){
+		return m_localCallbackMethod;
+	}
+	
+	public void setLocalCallbackMethod(Method callback){
+		m_localCallbackMethod = callback;
+	}
+	
+	private Method m_localCallbackMethod;
 
 	/*
 	 * Constructors
@@ -179,7 +206,10 @@ public class ZstMethod {
 		if (methodArgObj != null) {
 			methodsArgs = new HashMap<String, Object>();
 			for (Map.Entry<String, JsonElement> methodArg : methodArgObj.entrySet()) {
-				methodsArgs.put(methodArg.getKey(), methodArg.getValue().getAsString());
+				String valString = "";
+				if(!(methodArg.getValue() instanceof JsonNull))
+					valString = methodArg.getValue().getAsString();
+				methodsArgs.put(methodArg.getKey(), valString);
 			}
 		}
 		
