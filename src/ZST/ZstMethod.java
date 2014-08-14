@@ -117,7 +117,7 @@ public class ZstMethod {
 		m_accessMode = accessMode;
 		m_callback = callback;
 		m_callbackObject = callbackObject;
-		m_output = "";
+		m_output = null;
 
 		if (args != null)
 			m_args = args;
@@ -186,7 +186,6 @@ public class ZstMethod {
 			JsonObject methodObj = method.getValue().getAsJsonObject();
 			outMethods.put(method.getKey(), jsonObjToZstMethod(methodObj));
 		}
-
 		return outMethods;
 	}
 

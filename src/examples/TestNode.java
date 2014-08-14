@@ -32,17 +32,22 @@ public class TestNode{
         node.subscribeToNode(peers.get("LiveNode"));        
         node.connectToPeer(peers.get("LiveNode"));
         
-//        try {
-//			Thread.sleep(1000);
-//		} catch (InterruptedException e) {
-//			// TODO Auto-generated catch block
-//			e.printStackTrace();
-//		}
+        try {
+			Thread.sleep(1000);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
         
         Map<String, Object> args = new HashMap<String, Object>();
         args.put("trackindex", 0);
         args.put("clipindex", 0);
-        node.updateRemoteMethod(peers.get("LiveNode").getMethods().get("fire_clip"), args);
+        //node.updateRemoteMethod(peers.get("LiveNode").getMethods().get("fire_clip"), args);
+        
+        Map<String, Object> songArgs = new HashMap<String, Object>();
+        songArgs.put("category", 0);
+        ZstMethod response = node.updateRemoteMethod(peers.get("LiveNode").getMethods().get("get_tracks"), songArgs);
+        System.out.println(response.getOutput());
         
 		
 		//ZstMethod.mapToZstMethod(fakeArgs);

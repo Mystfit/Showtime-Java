@@ -780,7 +780,7 @@ public class ZstNode extends Thread {
     public ZstMethod updateRemoteMethod(ZstMethod method, Map<String, Object> args)
     {
     	Socket socket;
-    	if(method.getAccessMode() == ZstMethod.RESPONDER)
+    	if(method.getAccessMode().equals(ZstMethod.RESPONDER))
     		socket = m_peers.get(method.getNode()).getRequestSocket();
     	else
     		socket = m_publisher;
@@ -790,7 +790,7 @@ public class ZstNode extends Thread {
     			ZstMethod methodRequest = new ZstMethod(method.getName(), method.getNode(), method.getAccessMode(), args);
     			ZstIo.send(socket, method.getName(), methodRequest);
     			
-    			if(methodRequest.getAccessMode() == ZstMethod.RESPONDER){
+    			if(methodRequest.getAccessMode().equals(ZstMethod.RESPONDER)){
     				return ZstIo.recv(socket).data;
     			}
     		}
