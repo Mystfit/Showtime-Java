@@ -64,6 +64,9 @@ public class ZstNode extends Thread {
     protected int m_stagePort;
     protected String m_replyAddress;
     protected String m_publisherAddress;
+    
+    public void setVerbose(boolean verbose){m_verbose = verbose; }
+    private boolean m_verbose;
 
     public Map<String, ZstMethod> getMethods() { return m_methods; }
     protected Map<String, ZstMethod> m_methods;
@@ -146,9 +149,12 @@ public class ZstNode extends Thread {
 			m_stage.setLinger(0);
 			m_stage.connect(m_stageAddress);
 									
-			System.out.println("Stage located at " + (String)zmq.ZMQ.zmq_getsockoptx(m_stage.base(), zmq.ZMQ.ZMQ_LAST_ENDPOINT));
-			System.out.println("Node reply on address " + m_replyAddress);
-			System.out.println("Node publisher on address " + m_publisherAddress);
+			if(m_verbose) {
+				System.out.println("Stage located at " + (String)zmq.ZMQ.zmq_getsockoptx(m_stage.base(), zmq.ZMQ.ZMQ_LAST_ENDPOINT));
+				System.out.println("Node reply on address " + m_replyAddress);
+				System.out.println("Node publisher on address " + m_publisherAddress);
+			}
+			System.out.println("Showtime active!");
 		} else {
 			m_reply.bind("tcp://*:" + m_stagePort);
 		}
@@ -257,12 +263,13 @@ public class ZstNode extends Thread {
 	 * Message caller. Runs local methods from messages
 	 */
 	private void receiveMessage(MethodMessage recv) {
-		System.out.print("Recieved method '" + recv.method + "'");
+		if(m_verbose) System.out.print("Recieved method '" + recv.method + "'");
+		
 		if (recv.data != null)
         {
             if (recv.data.getOutput() != null)
-                System.out.print("' for '" + recv.data.getNode() + "' with value '" + recv.data.getOutput().toString());
-            System.out.println("'");
+                if(m_verbose) System.out.print("' for '" + recv.data.getNode() + "' with value '" + recv.data.getOutput().toString());
+            if(m_verbose) System.out.println("'");
 	
 			//Is this a method this node owns?
 			if(recv.data.getNode() == m_nodeId){
@@ -315,19 +322,19 @@ public class ZstNode extends Thread {
 	 * @return 		null
 	 */
 	private Object disconnectPeer(ZstMethod methodData){
-		 System.out.println("Peer '" + methodData.getNode() + "' is leaving.");
-         if (m_peers.containsKey(methodData.getNode()))
-         {
-             try{
-                 m_subscriber.disconnect(m_peers.get(methodData.getNode()).getPublisherAddress());
-             } catch (ZMQException e) {
-                 throw e;
-             }
-
-             m_peers.get(methodData.getNode()).disconnect();
-             m_peers.remove(methodData.getNode());
-         }
-         return null;
+		if(m_verbose) System.out.println("Peer '" + methodData.getNode() + "' is leaving.");
+	     if (m_peers.containsKey(methodData.getNode()))
+	     {
+	         try{
+	             m_subscriber.disconnect(m_peers.get(methodData.getNode()).getPublisherAddress());
+	         } catch (ZMQException e) {
+	             throw e;
+	         }
+	
+	         m_peers.get(methodData.getNode()).disconnect();
+	         m_peers.remove(methodData.getNode());
+	     }
+	     return null;
 	}
 	
 	/**
@@ -377,23 +384,21 @@ public class ZstNode extends Thread {
 	 * @param Socket 		Socket to register through
 	 */
     public Boolean requestRegisterNode(Socket socket){
-        System.out.println("REQ-->: Requesting remote node to register our addresses. Reply:" + m_replyAddress + ", Publisher:" + m_publisherAddress);
-        if(socket == null)
-        	socket = m_stage;
+    	if(m_verbose) System.out.println("REQ-->: Requesting remote node to register our addresses. Reply:" + m_replyAddress + ", Publisher:" + m_publisherAddress);
         
         Map<String, Object> requestArgs = new HashMap<String, Object>();
         requestArgs.put(ZstPeerlink.REPLY_ADDRESS, m_replyAddress);
         requestArgs.put(ZstPeerlink.PUBLISHER_ADDRESS, m_publisherAddress);
-        ZstMethod request = new ZstMethod(REPLY_REGISTER_NODE, m_nodeId, "", requestArgs);
+        ZstMethod request = new ZstMethod(REPLY_REGISTER_NODE, m_nodeId, ZstMethod.RESPONDER, requestArgs);
 
         ZstIo.send(socket, REPLY_REGISTER_NODE, request);
         MethodMessage message = ZstIo.recv(socket);
         
         if (message.method.equals(OK)){
-            System.out.println("REP<--: Remote node acknowledged our addresses. Reply:" + m_replyAddress + ", Publisher:" + m_publisherAddress);
+        	if(m_verbose) System.out.println("REP<--: Remote node acknowledged our addresses. Reply:" + m_replyAddress + ", Publisher:" + m_publisherAddress);
 			return true;
 		} else { 
-			System.out.println("REP<--:Remote node returned " + message.method + " instead of " + OK);
+			if(m_verbose) System.out.println("REP<--:Remote node returned " + message.method + " instead of " + OK);
 		}
 		return false;
     }
@@ -540,7 +545,7 @@ public class ZstNode extends Thread {
      */
     public void requestRegisterMethod(String method, String accessMode, Map<String, Object> args, Object callbackObject, Method callback, Socket socket)
     {
-        System.out.println("REQ-->: Registering method " + method + " with remote node and args " + args.toString());
+    	if(m_verbose) System.out.println("REQ-->: Registering method " + method + " with remote node and args " + args.toString());
 
         //Register local copy of our method first
         m_methods.put(method, new ZstMethod(method, m_nodeId, accessMode, args, callbackObject, callback));
@@ -550,9 +555,9 @@ public class ZstNode extends Thread {
         MethodMessage msg = ZstIo.recv(socket);
 
         if (msg.method.equals(OK))
-            System.out.println("REP<--: Remote node acknowledged our method '" + method + "'");
+        	if(m_verbose) System.out.println("REP<--: Remote node acknowledged our method '" + method + "'");
         else
-        	System.out.println("REP<--:Remote node returned " + msg.method + " instead of " + OK);
+        	if(m_verbose) System.out.println("REP<--:Remote node returned " + msg.method + " instead of " + OK);
     }
     
     
