@@ -222,8 +222,10 @@ public class ZstMethod {
 				methodData.get(METHOD_ORIGIN_NODE).getAsString(),
 				accessMode, 
 				methodsArgs);
-		if(!methodData.get(METHOD_OUTPUT).equals(JsonNull.INSTANCE)){
-			localMethod.setOutput(methodData.get(METHOD_OUTPUT).toString());
+		if(methodData.get(METHOD_OUTPUT) != null){
+			if(!methodData.get(METHOD_OUTPUT).equals(JsonNull.INSTANCE)){
+				localMethod.setOutput(methodData.get(METHOD_OUTPUT).toString());
+			}
 		}
 
 		return localMethod;

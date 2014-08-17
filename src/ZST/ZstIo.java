@@ -1,6 +1,5 @@
 package ZST;
 
-
 import org.zeromq.ZMQ;
 import org.zeromq.ZMQ.Socket;
 
@@ -13,12 +12,11 @@ import org.zeromq.ZMsg;
 public class ZstIo {
 	public static Gson gson = new Gson();
 	public static JsonParser jsonParser = new JsonParser();
-	
-	public static void send(Socket socket, String method)
-	{
+
+	public static void send(Socket socket, String method) {
 		ZstIo.send(socket, method, null);
 	}
-	
+
 	public static void send(Socket socket, String method, ZstMethod methodData)
 	{
 		ZMsg message = new ZMsg();
@@ -31,28 +29,26 @@ public class ZstIo {
 			message.add("{}");
 		}
 		
-		message.send(socket);
+		if(!message.send(socket))
+			System.out.println("Sending failed!");
 	}
-	
-	public static MethodMessage recv(Socket socket)
-	{
+
+	public static MethodMessage recv(Socket socket) {
 		return recv(socket, false);
 	}
-	
-	public static MethodMessage recv(Socket socket, Boolean noWait)
-	{
-		
+
+	public static MethodMessage recv(Socket socket, Boolean noWait) {
+
 		ZMsg message = null;
-		if(!noWait)
+		if (!noWait)
 			message = ZMsg.recvMsg(socket);
 		else
 			message = ZMsg.recvMsg(socket, ZMQ.DONTWAIT);
-		
+
 		String data = message.getLast().toString();
 		JsonObject mData = (JsonObject) ZstIo.jsonParser.parse(data);
-	
-		return new MethodMessage(message.getFirst().toString(), ZstMethod.jsonObjToZstMethod(mData));
+
+		return new MethodMessage(message.getFirst().toString(),
+				ZstMethod.jsonObjToZstMethod(mData));
 	}
 }
-
-

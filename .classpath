@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="lib" path="C:/Code/Showtime/Showtime-Java/lib/jeromq-0.3.4.jar" sourcepath="C:/Users/Byron/.m2/repository/org/zeromq/jeromq/0.3.4/jeromq-0.3.4-sources.jar"/>
+	<classpathentry kind="lib" path="C:/Code/Showtime/Showtime-Java/lib/gson-2.2.4.jar"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/jdk1.7.0_60"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

@@ -10,7 +10,7 @@ import ZST.ZstPeerlink;
 
 public class TestNode{
 	public TestNode(){
-		ZstNode node = new ZstNode("javatest", "tcp://curiosity.soad.vuw.ac.nz:6000");
+		ZstNode node = new ZstNode("javatest", "127.0.0.1:6000");
         node.start();
 		node.requestRegisterNode();
 		
@@ -27,7 +27,6 @@ public class TestNode{
         node.requestRegisterMethod("bloople", ZstMethod.WRITE, nodeArgs, this, testCallback);
         
         Map<String, ZstPeerlink> peers = node.requestNodePeerlinks();
-        
         
         node.subscribeToNode(peers.get("LiveNode"));        
         node.connectToPeer(peers.get("LiveNode"));
@@ -46,7 +45,7 @@ public class TestNode{
         
         Map<String, Object> songArgs = new HashMap<String, Object>();
         songArgs.put("category", 0);
-        ZstMethod response = node.updateRemoteMethod(peers.get("LiveNode").getMethods().get("get_tracks"), songArgs);
+        ZstMethod response = node.updateRemoteMethod(peers.get("LiveNode").getMethod("get_tracks"), songArgs);
         System.out.println(response.getOutput());
         
 		
